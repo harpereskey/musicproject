@@ -88,6 +88,54 @@ ggplot(data = polls,
 ```
 
 
+```{r}
+library(dplyr)
+library(ggplot2)
+
+country_gender <- polls |>
+  filter(!is.na(critic_country), !is.na(gender)) |>
+  group_by(critic_country) |>
+  summarise(
+    total = n(),
+    ratio_female = mean(gender == "female", na.rm = TRUE)
+  ) |> 
+  arrange(desc(ratio_female))
+
+
+```
+
+
+**ai**: asked for plot reccommendations with this code: 
+ggplot(country_gender, aes(x = reorder(critic_country, ratio_female), y = ratio_female, fill = ratio_female)) +
+  geom_col() +
+  scale_fill_viridis_c() +
+  theme_minimal() +
+  labs(
+    title = "Proportion of Female Artist Nominations by Critic's Country",
+    subtitle = "Dashed line = overall average | Countries with < 5 votes excluded",
+    x = NULL,
+    y = "Proportion of votes for female artists"
+  )
+
+took this: +
+  geom_hline(yintercept = mean(country_gender$ratio_female), 
+             linetype = "dashed", color = "blue", linewidth = 0.8) +
+             
+```{r}
+ggplot(country_gender, aes(x = reorder(critic_country, ratio_female), y = ratio_female, fill = ratio_female)) +
+  geom_col() +
+  geom_hline(yintercept = mean(country_gender$ratio_female), 
+             linetype = "dashed", color = "red", linewidth = 0.8) +
+  coord_flip() +
+  scale_fill_viridis_c() +  # continuous scale since ratio_female is numeric
+  theme_minimal() +
+  labs(
+    title = "Proportion of Female Artist Nominations by Critic's Country",
+    subtitle = "Dashed line = overall average | Countries with < 5 votes excluded",
+    x = NULL,
+    y = "Proportion of votes for female artists"
+  )
+```
 
 
 
