@@ -5,9 +5,9 @@ format: pdf
 
 # Introduction
 
-Description: (directly from TidyTuesday)
+Description: (directly from Tidy Tuesday)
 
-" Earlier this year, BBC Music asked more than 100 critics, artists, and other music industry folks from 15 countries for their five favorite hip-hop tracks. Then they broke down the results of the poll into one definitive list. But BBC Music didn't just publish a best-of list, they also published the complete poll results and a description of the simple algorithm they ranked the songs with. - Simon Jockers
+"Earlier this year, BBC Music asked more than 100 critics, artists, and other music industry folks from 15 countries for their five favorite hip-hop tracks. Then they broke down the results of the poll into one definitive list. But BBC Music didn't just publish a best-of list, they also published the complete poll results and a description of the simple algorithm they ranked the songs with. - Simon Jockers
 
 We awarded 10 points for first ranked track, eight points for second ranked track, and so on down to two points for fifth place. The song with the most points won. We split ties by the total number of votes: songs with more votes ranked higher. Any ties remaining after this were split by first place votes, followed by second place votes and so on: songs with more critics placing them at higher up the lists up ranked higher. -- BBC Music "
 
@@ -145,6 +145,14 @@ ggplot(country_gender, aes(x = reorder(critic_country, ratio_female), y = ratio_
   ) + theme_minimal()
 ```
 
+## 4/20
+*google search* is new zealand more progressive with women's rights?
+*result* Yes, New Zealand is considered highly progressive with women's rights, famously becoming the first country to grant women the right to vote in 1893. It boasts high levels of female political representation—nearly 50% in parliament—and strong legal frameworks for gender equality. However, challenges remain, including a gender pay gap and high rates of domestic violence. 
+
+*google search* is new zealand more progressive with women's rights in 1990 to 2000
+*result* Yes, New Zealand was considered significantly more progressive with women's rights in the 1990–2000 period, characterized by a rapid shift towards top-tier political leadership and the strengthening of legislative protection for women. This decade solidified the country's earlier reputation for equality by breaking the highest "glass ceiling" in politics and reforming domestic laws.
+
+
 # Predictive Model
 
 -- predictive model next:
@@ -236,18 +244,113 @@ From 1992 to 1998, music was defined by the rise of hip-hop into the mainstream,
 ## 4/20/26
 *ai* 
 *prompt* here is what i have (my code), what else can i explore
-*used* Do critics from certain countries tend to rank female artists higher (rank 1–2) vs. just including them? You have the rank + country data to cross this.
-Do female critics nominate female artists more than male critics do? Your polls2 object is close to this — just join back critic gender if that's inferable, or look at critic_rols instead.
+*used* Does a critic's role (journalist, artist, producer, etc.) predict whether they nominate female artists? You have critic_rols unused so far.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+role_female <- polls |>
+  filter(!is.na(critic_rols), !is.na(gender)) |>
+  group_by(critic_rols) |>
+  summarise(
+    total = n(),
+    ratio_female = mean(gender == "female", na.rm = TRUE)
+  ) |>
+  filter(total >= 5)  # drop rare roles
+
+ggplot(role_female, aes(x = reorder(critic_rols, ratio_female), 
+                         y = ratio_female, fill = ratio_female)) +
+  geom_col() +
+  geom_hline(yintercept = mean(role_female$ratio_female),
+             linetype = "dashed", color = "red", linewidth = 0.8) +
+  coord_flip() +
+  scale_fill_viridis_c() +
+  theme_minimal() +
+  labs(title = "Female Artist Nominations by Critic Role",
+       subtitle = "Dashed line = overall average",
+       x = NULL, y = "Proportion of female artist nominations")
+```
+
+## shiny app
+this is my favorite visualization so far:
+
+```{r}
+ggplot(data = polls, aes(x = gender, y = rank)) +
+  geom_point(aes(fill = gender),
+             position = position_jitter(width = 0.25, height = 0.12),
+             alpha = 0.3,
+             shape = 21) +
+  geom_point(data = pred,
+             aes(x = x, y = predicted, fill = x),
+             size = 5,
+             shape = 21) +
+  theme_minimal() +
+  scale_fill_viridis_d() + labs(
+    title = "Does Artist Gender Affect Song Ranking?",
+    x = "Artist Gender",
+    y = "Rank (1 = Best)"
+  )
+```
 
 
+```{r}
+library(shiny)
+# inputs be year, country, 
+# produce graph and table
+# locked facet by gender
+ui <- fluidPage(
+  sidebarLayout(
+    sidebarPanel(
+      sliderInput("year", "Year Range",
+                  min = 1979,
+                  max = 2019,
+                  value = c(1979, 2019),
+                  sep = ""),
+      radioButtons("variable_choose",
+                   label = "Choose a Variable: ",
+                   choices = c("critic_country", "gender"))
+    ),                        # close sidebarPanel
+    mainPanel(
+      plotOutput("plot")
+    )                         # close mainPanel
+  )                           # close sidebarLayout
+)                             # close fluidPage
+server <- function(input, output, session) {
+  
+  filtered <- reactive({
+    polls |>
+      filter(year >= input$year[1], year <= input$year[2])
+  })
+  
+output$plot <- renderPlot({
+  ggplot(filtered(), aes(x = .data[[input$variable_choose]], y = rank, color = gender)) +
+    geom_jitter(alpha = 0.4, width = 0.25, height = 0.1) +
+    scale_color_viridis_d() +
+    theme_minimal() +
+    labs(title = paste("Votes by", input$variable_choose),
+         x = input$variable_choose,
+         y = "Rank") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+})
+}
+shinyApp(ui, server)
+```
 
 
+How much of the distribution of top five ranks can we blame gender bias on versus blame the ration of male to female artists? Or is the root of the problem the lack of encouragement in female artists (underlying problems). did female artists increase over time?
 
 
-
-
-
-
+```{r}
+## When female artists were nominated, were they ranked fairly?
+polls |>
+  filter(!is.na(gender)) |>
+  group_by(gender) |>
+  summarise(avg_rank = mean(rank))
+```
+Underrepresentation: industry is ~70-80% male, polls likely match that
+Ranking bias: female artists are nominated less and ranked lower when they are — avg rank 3.5 vs 2.9
+Mixed sitting in the middle (3.15), groups with women aren't penalized as much as solo female artists
 
 
 
