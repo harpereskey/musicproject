@@ -233,5 +233,24 @@ Are there really more male songs, or just more male songs in these ratings?
 ## Claude: "what was going on in music from 1992 to 1998"
 From 1992 to 1998, music was defined by the rise of hip-hop into the mainstream, the dominance of alternative rock, and highly commercial pop and R&B, making it one of the most influential and male-dominated eras in modern music history.
 
+## 4/20/26
+*ai* 
+*prompt* here is what i have (my code), what else can i explore
+*used* Do critics from certain countries tend to rank female artists higher (rank 1–2) vs. just including them? You have the rank + country data to cross this.
+Do female critics nominate female artists more than male critics do? Your polls2 object is close to this — just join back critic gender if that's inferable, or look at critic_rols instead.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
