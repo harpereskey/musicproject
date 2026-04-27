@@ -1,0 +1,92 @@
+---
+title: "Final Presentation"
+format: revealjs
+editor: visual
+---
+
+## Data Description
+
+BBC Music polled more than 100 critics, artists, and music industry professionals from 15 countries, asking each participant to submit their five favorite hip-hop tracks. The results were compiled into a definitive ranked list using a straightforward points-based algorithm. Songs received 10 points for a first-place vote, eight for second, and so on down to two points for fifth place, with the highest total winning.
+
+------------------------------------------------------------------------
+
+## polls.cvs
+| item            | description                |
+|-----------------|----------------------------|
+| rank            | Rank given by voter (1-5)  |
+| title           | Title of song              |
+| artist          | Artist                     |
+| gender          | Gender of artist           |
+
+## polls.cvs
+| item            | description                |
+|-----------------|----------------------------|
+| year            | Year song released         |
+| critic_name     | Name of critic             |
+| critic_rols     | Critic's role              |
+| critic_country  | Critic's primary country   |
+| critic_country2 | Critic's secondary country |
+
+## ranks.cvs
+
+-   ID: ID of song\
+-   title: Title of song\
+-   artist: Artist's name\
+-   year: Year song released\
+-   gender: Gender of artist/group\
+-   points: Total points awarded\
+-   n: Total votes\
+-   n1–n5: Votes by rank
+
+
+```{r message = FALSE}
+library(readr)
+polls <- read_csv("data/polls.csv")
+ranks <- read_csv("data/rankings.csv")
+```
+
+## Summary Statistics
+```{r}
+library(dplyr)
+polls |> group_by(gender) |>
+  summarise(mean = mean(rank))
+```
+
+
+```{r}
+library(dplyr)
+ranks |> group_by(gender) |>
+  summarise(ratio_n1 = sum(n1) / sum(n),
+            ratio_n2 = sum(n2) / sum(n),
+            ratio_n3 = sum(n3) / sum(n),
+            ratio_n4 = sum(n4) / sum(n),
+            ratio_n5 = sum(n5) / sum(n))
+```
+
+# Critics Analysis
+
+```{r}
+## see the ratio of women in each critics top five
+library(dplyr)
+polls2 <- polls |> group_by(critic_name) |>
+  summarise(sum = sum(gender == "female", na.rm = TRUE),
+            ratio_women_top5 = mean(gender == "female", na.rm = TRUE),
+            ratio_men_top5 = mean(gender == "male", na.rm=TRUE))
+```
+
+# Visualization
+
+## Votes by Gender
+
+**prompt (claude):** code + debug, added factor to fill to aes:
+
+```{r}
+library(ggplot2)
+ggplot(data = polls, 
+       aes(x = gender, 
+           fill = factor(rank))) + 
+  geom_bar() + 
+  theme_minimal() +
+  scale_fill_viridis_d() +
+  labs(title = "Count of Top 5 Vote by Gender")
+```
