@@ -8,6 +8,9 @@ format:
     number-sections: true
 ---
 
+# GitHub
+https://github.com/harpereskey/musicproject
+
 # Introduction
 
 This project looks at data from BBC Music's hip-hop poll, where more than 100 critics, artists, and music industry people from 15 countries each picked their five favorite hip-hop tracks. The main question is: **does artist gender affect how songs are nominated and ranked?**
