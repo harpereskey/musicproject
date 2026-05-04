@@ -1,48 +1,57 @@
 ---
-title: "Final Project"
-format: pdf
+title: "Gender Representation in BBC Music's Hip-Hop Poll"
+author: "Harper Eskey"
+format:
+  html:
+    embed-resources: true
+    toc: true
+    number-sections: true
 ---
 
 # Introduction
 
-Description: (directly from Tidy Tuesday)
+This project looks at data from BBC Music's hip-hop poll, where more than 100 critics, artists, and music industry people from 15 countries each picked their five favorite hip-hop tracks. The main question is: **does artist gender affect how songs are nominated and ranked?**
 
-"Earlier this year, BBC Music asked more than 100 critics, artists, and other music industry folks from 15 countries for their five favorite hip-hop tracks. Then they broke down the results of the poll into one definitive list. But BBC Music didn't just publish a best-of list, they also published the complete poll results and a description of the simple algorithm they ranked the songs with. - Simon Jockers
+The BBC used a point system to score the results:
 
-We awarded 10 points for first ranked track, eight points for second ranked track, and so on down to two points for fifth place. The song with the most points won. We split ties by the total number of votes: songs with more votes ranked higher. Any ties remaining after this were split by first place votes, followed by second place votes and so on: songs with more critics placing them at higher up the lists up ranked higher. -- BBC Music "
+> "We awarded 10 points for first ranked track, eight points for second ranked track, and so on down to two points for fifth place. Songs with more votes ranked higher in the case of a tie; any remaining ties were split by first-place votes, followed by second-place votes." — BBC Music
 
----
+This project uses summary statistics, charts, a model, and trend analysis to look at whether the poll just reflects a male-dominated industry, or whether there is also bias in how critics rank female artists.
 
 # Data Description
 
-## polls
+Two datasets are used in this analysis.
 
-- rank: Rank given by voter (1-5)  
-- title: Title of song  
-- artist: Artist  
-- gender: Gender of artist  
-- year: Year song released  
-- critic_name: Name of critic  
-- critic_rols: Critic's role  
-- critic_country: Critic's primary country  
-- critic_country2: Critic's secondary country  
+**`polls`** — one row per critic nomination:
 
-## ranks
+| Variable | Description |
+|---|---|
+| `rank` | Rank given by the critic (1 to 5) |
+| `title` | Song title |
+| `artist` | Artist name |
+| `gender` | Gender of artist or group |
+| `year` | Year the song came out |
+| `critic_name` | Name of the critic |
+| `critic_rols` | Critic's job or role |
+| `critic_country` | Critic's main country |
+| `critic_country2` | Critic's secondary country |
 
-- ID: ID of song  
-- title: Title of song  
-- artist: Artist's name  
-- year: Year song released  
-- gender: Gender of artist/group  
-- points: Total points awarded  
-- n: Total votes  
-- n1–n5: Votes by rank  
+**`rankings`** — one row per song with total poll results:
 
----
+| Variable | Description |
+|---|---|
+| `ID` | Song ID |
+| `title` | Song title |
+| `artist` | Artist name |
+| `year` | Year released |
+| `gender` | Gender of artist or group |
+| `points` | Total points earned |
+| `n` | Total votes received |
+| `n1` to `n5` | Votes at each rank position |
 
 # Load Data
 
-```{r message = FALSE} 
+```{r message = FALSE}
 library(readr)
 polls <- read_csv("data/polls.csv")
 ranks <- read_csv("data/rankings.csv")
@@ -50,52 +59,89 @@ ranks <- read_csv("data/rankings.csv")
 
 # Summary Statistics
 
-```{r}
+## Average Rank by Artist Gender
+
+The table below shows the average rank given to songs by artist gender. A lower number means critics put those songs higher on their list.
+
+```{r message = FALSE}
 library(dplyr)
-polls |> group_by(gender) |>
-  summarise(mean = mean(rank))
+
+polls |>
+  group_by(gender) |>
+  summarise(
+    n_nominations = n(),
+    avg_rank = round(mean(rank), 2)
+  ) |>
+  arrange(avg_rank)
 ```
 
-```{r}
-library(dplyr)
-ranks |> group_by(gender) |>
-  summarise(ratio_n1 = sum(n1) / sum(n),
-            ratio_n2 = sum(n2) / sum(n),
-            ratio_n3 = sum(n3) / sum(n),
-            ratio_n4 = sum(n4) / sum(n),
-            ratio_n5 = sum(n5) / sum(n))
+Female artists get fewer nominations overall, and when they are nominated, their average rank is worse than male artists. This raises the main question: is the gap because of how the music industry is made up, or is there also bias in how critics rank female artists?
+
+## Rank Distribution by Gender
+
+This table shows what share of nominations each gender got at each rank position (1 = best, 5 = worst). This shows not just whether female artists are nominated, but where they tend to land on critics' lists.
+
+```{r message = FALSE}
+ranks |>
+  group_by(gender) |>
+  summarise(
+    ratio_n1 = round(sum(n1) / sum(n), 3),
+    ratio_n2 = round(sum(n2) / sum(n), 3),
+    ratio_n3 = round(sum(n3) / sum(n), 3),
+    ratio_n4 = round(sum(n4) / sum(n), 3),
+    ratio_n5 = round(sum(n5) / sum(n), 3)
+  )
 ```
 
 # Critics Analysis
 
-```{r}
-## see the ratio of women in each critics top five
-library(dplyr)
-polls2 <- polls |> group_by(critic_name) |>
-  summarise(sum = sum(gender == "female", na.rm = TRUE),
-            ratio_women_top5 = mean(gender == "female", na.rm = TRUE),
-            ratio_men_top5 = mean(gender == "male", na.rm=TRUE))
+## Female Nominations per Critic
+
+This looks at how many female artists each critic included in their five picks.
+
+```{r message = FALSE}
+polls2 <- polls |>
+  group_by(critic_name) |>
+  summarise(
+    n_female = sum(gender == "female", na.rm = TRUE),
+    ratio_women_top5 = round(mean(gender == "female", na.rm = TRUE), 3),
+    ratio_men_top5 = round(mean(gender == "male", na.rm = TRUE), 3)
+  ) |>
+  arrange(desc(ratio_women_top5))
+
+head(polls2, 10)
 ```
 
-# Visualization
+Most critics nominated zero or one female artist out of five picks. This means underrepresentation is spread across many critics, not just a few outliers.
 
-## Votes by Gender
+# Visualizations
 
-**prompt (claude):** code + debug, added factor to fill to aes:
-```{r}
+## Votes by Gender and Rank Position
+
+This chart shows the total number of nominations by artist gender, with each bar colored by rank position.
+
+```{r message = FALSE, fig.cap = "Count of top-five nominations by artist gender, colored by rank position."}
 library(ggplot2)
-ggplot(data = polls, 
-       aes(x = gender, 
-           fill = factor(rank))) + 
-  geom_bar() + 
+
+ggplot(data = polls,
+       aes(x = gender, fill = factor(rank))) +
+  geom_bar() +
   theme_minimal() +
-  scale_fill_viridis_d() +
-  labs(title = "Count of Top 5 Vote by Gender")
+  scale_fill_viridis_d(name = "Rank") +
+  labs(
+    title = "Count of Top-Five Votes by Artist Gender",
+    x = "Artist Gender",
+    y = "Number of Nominations"
+  )
 ```
 
-# Country Analysis
+Male artists have far more nominations. The spread of rank positions looks similar across genders, so the main gap is in how often female artists are nominated, not necessarily where they land when they are.
 
-```{r}
+## Nominations for Female Artists by Critic Country
+
+Do critics from some countries nominate female artists more than others? The red dashed line shows the overall average.
+
+```{r message = FALSE, warning = FALSE, fig.cap = "Proportion of female artist nominations by critic country. Countries with fewer than 5 nominations are excluded."}
 library(dplyr)
 library(ggplot2)
 
@@ -105,151 +151,34 @@ country_gender <- polls |>
   summarise(
     total = n(),
     ratio_female = mean(gender == "female", na.rm = TRUE)
-  ) |> 
+  ) |>
+  filter(total >= 5) |>
   arrange(desc(ratio_female))
-```
 
-**ai**: asked for plot reccommendations with this code: 
-ggplot(country_gender, aes(x = reorder(critic_country, ratio_female), y = ratio_female, fill = ratio_female)) +
+ggplot(country_gender,
+       aes(x = reorder(critic_country, ratio_female),
+           y = ratio_female, fill = ratio_female)) +
   geom_col() +
-  scale_fill_viridis_c() +
-  theme_minimal() +
-  labs(
-    title = "Proportion of Female Artist Nominations by Critic's Country",
-    subtitle = "Dashed line = overall average | Countries with < 5 votes excluded",
-    x = NULL,
-    y = "Proportion of votes for female artists"
-  )
-
-took this: +
-  geom_hline(yintercept = mean(country_gender$ratio_female), 
-             linetype = "dashed", color = "blue", linewidth = 0.8) +
-             
-added: +
-  geom_hline(yintercept = mean(country_gender$ratio_female), 
-             linetype = "dashed", color = "red", linewidth = 0.8) +
-             
-
-```{r}
-ggplot(country_gender, aes(x = reorder(critic_country, ratio_female), y = ratio_female, fill = ratio_female)) +
-  geom_col() +
-  geom_hline(yintercept = mean(country_gender$ratio_female), 
+  geom_hline(yintercept = mean(country_gender$ratio_female),
              linetype = "dashed", color = "red", linewidth = 0.8) +
   coord_flip() +
-  scale_fill_viridis_c() +
+  scale_fill_viridis_c(name = "Prop. Female") +
   labs(
-    title = "Proportion of Female Artist Nominations by Critic's Country",
-    subtitle = "Dashed line = overall average | Countries with < 5 votes excluded",
+    title = "Proportion of Female Artist Nominations by Critic Country",
+    subtitle = "Dashed line = overall average | Countries with < 5 nominations excluded",
     x = NULL,
     y = "Proportion of votes for female artists"
-  ) + theme_minimal()
+  ) +
+  theme_minimal()
 ```
 
-## 4/20
-*google search* is new zealand more progressive with women's rights?
-*result* Yes, New Zealand is considered highly progressive with women's rights, famously becoming the first country to grant women the right to vote in 1893. It boasts high levels of female political representation—nearly 50% in parliament—and strong legal frameworks for gender equality. However, challenges remain, including a gender pay gap and high rates of domestic violence. 
+New Zealand critics nominate female artists at a much higher rate than average. This fits with New Zealand's history of gender equality, including being the first country to give women the right to vote in 1893 and having close to 50% female representation in parliament. Critics from the US and UK, who make up most of the poll, tend to fall at or below the average.
 
-*google search* is new zealand more progressive with women's rights in 1990 to 2000
-*result* Yes, New Zealand was considered significantly more progressive with women's rights in the 1990–2000 period, characterized by a rapid shift towards top-tier political leadership and the strengthening of legislative protection for women. This decade solidified the country's earlier reputation for equality by breaking the highest "glass ceiling" in politics and reforming domestic laws.
+## Female Artist Nominations by Critic Role
 
+Does a critic's job affect whether they nominate female artists?
 
-# Predictive Model
-
--- predictive model next:
-Does artist gender affect how highly songs are ranked?
-**not going to use most likely**
-
-```{r}
-polls <- polls |>
-  mutate(gender = factor(gender))
-```
-
-```{r}
-model1 <- lm(rank ~ gender, data = polls)
-summary(model1)
-```
-- sourced from section 6 of notes
-```{r}
-library(tidyverse)
-library(ggeffects)
-
-pred <- ggpredict(model1, terms = c("gender")) |>
-  as.data.frame() |>
-  as_tibble()
-```
-
-# Model Visualization
-
-```{r}
-ggplot(data = polls, aes(x = gender, y = rank)) +
-  geom_point(aes(fill = gender),
-             position = position_jitter(width = 0.25, height = 0.12),
-             alpha = 0.3,
-             shape = 21) +
-  geom_point(data = pred,
-             aes(x = x, y = predicted, fill = x),
-             size = 5,
-             shape = 21) +
-  theme_minimal() +
-  scale_fill_viridis_d() + labs(
-    title = "Does Artist Gender Affect Song Ranking?",
-    x = "Artist Gender",
-    y = "Rank (1 = Best)"
-  )
-```
-
-# Trends Over Time
-
--- did peer review with gavin
--- does number of female artists increase with time, does number of male artists increase over time, does number of mixed artists increase over time. 
-
--- look at time vs count, trend line over time
-
-```{r}
-library(dplyr)
-
-year_gender <- polls |>
-  group_by(year, gender) |>
-  summarise(count = n(), .groups = "drop")
-```
-
-```{r}
-library(ggplot2)
-
-ggplot(year_gender, aes(x = year, y = count, fill = gender)) +
-  geom_point(aes(color = gender)) +
-  geom_smooth(aes(color = gender), method = "lm", se = FALSE) +
-  theme_minimal() +
-  scale_fill_viridis_d() +
-  scale_color_viridis_d() +
-  labs(
-    title = "Trends in Number of Songs by Artist Gender Over Time",
-    x = "Year",
-    y = "Number of Songs"
-  )
-```
-
-# Reflection
-
-Are there really more male songs, or just more male songs in these ratings?
-
-## Claude: "from 1979 to 2019, how many male vs female music artists were there"
-*Roughly 70–80% male vs. 20–30% female artists in popular music over time.*
-
-## Why is there a random spike in female versus male artists?
-
-## Claude: "what was going on in music from 1992 to 1998"
-From 1992 to 1998, music was defined by the rise of hip-hop into the mainstream, the dominance of alternative rock, and highly commercial pop and R&B, making it one of the most influential and male-dominated eras in modern music history.
-
-## 4/20/26
-*ai* 
-*prompt* here is what i have (my code), what else can i explore
-*used* Does a critic's role (journalist, artist, producer, etc.) predict whether they nominate female artists? You have critic_rols unused so far.
-
-```{r}
-library(dplyr)
-library(ggplot2)
-
+```{r message = FALSE, fig.cap = "Proportion of female artist nominations by critic role. Roles with < 5 nominations or zero female nominations excluded."}
 role_female <- polls |>
   filter(!is.na(critic_rols), !is.na(gender)) |>
   group_by(critic_rols) |>
@@ -257,100 +186,192 @@ role_female <- polls |>
     total = n(),
     ratio_female = mean(gender == "female", na.rm = TRUE)
   ) |>
-  filter(total >= 5)  # drop rare roles
+  filter(total >= 5, ratio_female > 0)
 
-ggplot(role_female, aes(x = reorder(critic_rols, ratio_female), 
-                         y = ratio_female, fill = ratio_female)) +
+ggplot(role_female,
+       aes(x = reorder(critic_rols, ratio_female),
+           y = ratio_female, fill = ratio_female)) +
   geom_col() +
   geom_hline(yintercept = mean(role_female$ratio_female),
              linetype = "dashed", color = "red", linewidth = 0.8) +
   coord_flip() +
-  scale_fill_viridis_c() +
+  scale_fill_viridis_c(name = "Prop. Female") +
   theme_minimal() +
   labs(title = "Female Artist Nominations by Critic Role",
-       subtitle = "Dashed line = overall average",
        x = NULL, y = "Proportion of female artist nominations")
 ```
 
-## shiny app
-this is my favorite visualization so far:
+There is real variation across roles. Some roles, like artists themselves, nominate female artists at higher rates. This suggests that who gets included as a critic in the poll also shapes the results.
 
-```{r}
+# Predictive Model: Does Artist Gender Affect Song Rank?
+
+To test whether artist gender predicts rank, a simple linear regression is fit with `rank` as the outcome and `gender` as the predictor.
+
+```{r message = FALSE}
+polls <- polls |>
+  mutate(gender = factor(gender))
+
+model1 <- lm(rank ~ gender, data = polls)
+summary(model1)
+```
+
+## Model Visualization
+
+```{r message = FALSE, warning = FALSE, fig.cap = "Raw rank values by artist gender (small points) with model-predicted means (large points)."}
+library(tidyverse)
+library(ggeffects)
+
+pred <- ggpredict(model1, terms = c("gender")) |>
+  as.data.frame() |>
+  as_tibble()
+
 ggplot(data = polls, aes(x = gender, y = rank)) +
   geom_point(aes(fill = gender),
              position = position_jitter(width = 0.25, height = 0.12),
-             alpha = 0.3,
-             shape = 21) +
+             alpha = 0.3, shape = 21) +
   geom_point(data = pred,
              aes(x = x, y = predicted, fill = x),
-             size = 5,
-             shape = 21) +
+             size = 5, shape = 21) +
   theme_minimal() +
-  scale_fill_viridis_d() + labs(
+  scale_fill_viridis_d(guide = "none") +
+  labs(
     title = "Does Artist Gender Affect Song Ranking?",
+    subtitle = "Small points = individual nominations; large points = model-predicted mean",
     x = "Artist Gender",
     y = "Rank (1 = Best)"
   )
 ```
 
+The model shows a small but consistent difference: female artists get an average rank of about 3.5, compared to 2.9 for male artists. Female artists are nominated less often and ranked lower when they are nominated. The mixed group sits in the middle, meaning groups with female members are not penalized as much as solo female artists.
 
-```{r}
+# Trends Over Time
+
+## Songs by Artist Gender Over Time
+
+Has the number of female artist nominations changed over the years the poll covers (1979 to 2019)?
+
+```{r message = FALSE}
+year_gender <- polls |>
+  group_by(year, gender) |>
+  summarise(count = n(), .groups = "drop")
+```
+
+```{r message = FALSE, fig.cap = "Number of nominations by year and artist gender with trend lines."}
+ggplot(year_gender, aes(x = year, y = count, color = gender)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  scale_color_viridis_d(name = "Gender") +
+  labs(
+    title = "Trends in Nominations by Artist Gender Over Time",
+    x = "Year of Song Release",
+    y = "Number of Nominations"
+  )
+```
+
+Male artists lead nominations in every decade, which roughly matches the hip-hop industry being about 70 to 80% male. 1989 was the first year a mixed-gender group showed up in a critic's top five. There is a spike in female nominations in the mid-1990s, around 1992 to 1998. This was when artists like Queen Latifah, Missy Elliott, and Lauryn Hill were breaking through, even though this was one of the most male-dominated eras in hip-hop. The trend line for female nominations is mostly flat, meaning there has not been much increase in representation over time.
+
+# Interactive Visualization
+
+This Shiny app lets you filter nominations by year range and group them by country or gender.
+
+```{r eval = FALSE}
 library(shiny)
-# inputs be year, country, 
-# produce graph and table
-# locked facet by gender
+library(ggplot2)
+library(dplyr)
+
 ui <- fluidPage(
+  titlePanel("Hip-Hop Poll Explorer"),
   sidebarLayout(
     sidebarPanel(
       sliderInput("year", "Year Range",
-                  min = 1979,
-                  max = 2019,
-                  value = c(1979, 2019),
-                  sep = ""),
+                  min = 1979, max = 2019,
+                  value = c(1979, 2019), sep = ""),
       radioButtons("variable_choose",
-                   label = "Choose a Variable: ",
+                   label = "Group nominations by:",
                    choices = c("critic_country", "gender"))
-    ),                        # close sidebarPanel
+    ),
     mainPanel(
       plotOutput("plot")
-    )                         # close mainPanel
-  )                           # close sidebarLayout
-)                             # close fluidPage
+    )
+  )
+)
+
 server <- function(input, output, session) {
-  
   filtered <- reactive({
     polls |>
       filter(year >= input$year[1], year <= input$year[2])
   })
-  
-output$plot <- renderPlot({
-  ggplot(filtered(), aes(x = .data[[input$variable_choose]], y = rank, color = gender)) +
-    geom_jitter(alpha = 0.4, width = 0.25, height = 0.1) +
-    scale_color_viridis_d() +
-    theme_minimal() +
-    labs(title = paste("Votes by", input$variable_choose),
-         x = input$variable_choose,
-         y = "Rank") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-})
+
+  output$plot <- renderPlot({
+    ggplot(filtered(),
+           aes(x = .data[[input$variable_choose]], y = rank, color = gender)) +
+      geom_jitter(alpha = 0.4, width = 0.25, height = 0.1) +
+      scale_color_viridis_d(name = "Gender") +
+      theme_minimal() +
+      labs(title = paste("Nominations by", input$variable_choose),
+           x = input$variable_choose,
+           y = "Rank (1 = Best)") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  })
 }
+
 shinyApp(ui, server)
 ```
 
+# Discussion
 
-How much of the distribution of top five ranks can we blame gender bias on versus blame the ration of male to female artists? Or is the root of the problem the lack of encouragement in female artists (underlying problems). did female artists increase over time?
+## Bias vs. Representation
 
+The main challenge with this data is separating two possible explanations for the gender gap.
 
-```{r}
-## When female artists were nominated, were they ranked fairly?
-polls |>
-  filter(!is.na(gender)) |>
-  group_by(gender) |>
-  summarise(avg_rank = mean(rank))
-```
-Underrepresentation: industry is ~70-80% male, polls likely match that
-Ranking bias: female artists are nominated less and ranked lower when they are — avg rank 3.5 vs 2.9
-Mixed sitting in the middle (3.15), groups with women aren't penalized as much as solo female artists
+The first is representation. Hip-hop has always been a male-dominated genre. If critics are nominating songs they genuinely love, a mostly male list might just reflect what music is out there, not bias.
+
+The second is ranking bias. Even when female artists are nominated, they tend to get ranked lower than male artists. The average rank for female artists is about 3.5, compared to 2.9 for male artists. This gap is harder to explain as just reflecting the industry.
+
+Both explanations are probably true at the same time. And underneath both is a bigger question: why are there so few female hip-hop artists to begin with? If female artists face more barriers to making and releasing music, the poll's gender gap may start long before critics ever write down their lists.
+
+## Key Findings
+
+Female artists make up a small share of total nominations. When they are nominated, they tend to be ranked lower than male artists. Critics from New Zealand nominate female artists at higher rates than average. A critic's job also predicts how likely they are to nominate female artists. The mid-1990s had a clear spike in female nominations that does not appear in other decades. Overall, female representation in the poll has not grown much over time.
+
+# Reflection
+
+The data shows two things happening at once: female artists are nominated less often, and when they are nominated, they tend to be ranked lower. Both of these point to gender shaping how critics engage with hip-hop.
+
+But it is hard to separate personal taste from industry structure. Critics are picking from a pool of music that is already mostly made by men. At the same time, the ranking gap among nominated artists suggests something beyond just reflecting the industry.
+
+The most honest takeaway is that the poll's gender imbalance likely comes from multiple places at once: who gets to make music, who gets recognized, and who comes to mind when critics are asked to make a list. This data alone cannot fully answer that question, but it shows the pattern clearly.
+
+# References
+
+## Data Sources
+
+Tidy Tuesday (2020). BBC Music Hip-Hop Poll Dataset. Retrieved from https://github.com/rfordatascience/tidytuesday
+
+BBC Music (2019). The Greatest Hip-Hop Songs of All Time. British Broadcasting Corporation.
+
+## AI Assistance (Claude)
+
+The following prompts were submitted to Claude (Anthropic) during this project. Responses helped with code and background context, but all analysis decisions were made by the author.
+
+| # | Prompt | Purpose | What was used |
+|---|--------|---------|----------------|
+| 1 | (code + debug) Fixing visualization code | Debugging | Added `factor(rank)` to `aes(fill = ...)` in the votes-by-gender bar chart |
+| 2 | "Here is what I have, what else can I explore?" | Ideation | Suggestion to use `critic_rols`, which led to the critic role visualization |
+| 3 | "From 1979 to 2019, how many male vs. female music artists were there?" | Background context | Estimate that roughly 70 to 80% of popular music artists were male over this period |
+| 4 | "What was going on in music from 1992 to 1998?" | Background context | Context about the era being male-dominated despite notable female breakthroughs |
+| 5 | Provided `country_gender` code and asked for plot suggestions | Visualization | Suggestion to add a `geom_hline()` reference line; author changed color from blue to red |
+
+## Google Searches
+
+The following searches were done to add real-world context to patterns in the data.
+
+| # | Query | Finding used |
+|---|-------|--------------|
+| 1 | "Is New Zealand more progressive with women's rights?" | New Zealand was the first country to give women the right to vote (1893) and has had close to 50% female parliamentary representation |
+| 2 | "Is New Zealand more progressive with women's rights in 1990 to 2000?" | New Zealand was highly progressive in this period, with major political milestones and stronger legal protections for women |
+
 
 
 

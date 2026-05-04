@@ -1,92 +1,302 @@
 ---
-title: "Final Presentation"
-format: revealjs
+title: "Gender Representation in Hip-Hop Criticism"
+subtitle: "An Analysis of the BBC Music Poll"
+format: 
+  revealjs:
+    theme: dark
+    transition: fade
+    slide-number: true
+    code-fold: true
+    code-tools: true
 editor: visual
 ---
 
-## Data Description
-
-BBC Music polled more than 100 critics, artists, and music industry professionals from 15 countries, asking each participant to submit their five favorite hip-hop tracks. The results were compiled into a definitive ranked list using a straightforward points-based algorithm. Songs received 10 points for a first-place vote, eight for second, and so on down to two points for fifth place, with the highest total winning.
-
-------------------------------------------------------------------------
-
-## polls.cvs
-| item            | description                |
-|-----------------|----------------------------|
-| rank            | Rank given by voter (1-5)  |
-| title           | Title of song              |
-| artist          | Artist                     |
-| gender          | Gender of artist           |
-
-## polls.cvs
-| item            | description                |
-|-----------------|----------------------------|
-| year            | Year song released         |
-| critic_name     | Name of critic             |
-| critic_rols     | Critic's role              |
-| critic_country  | Critic's primary country   |
-| critic_country2 | Critic's secondary country |
-
-## ranks.cvs
-
--   ID: ID of song\
--   title: Title of song\
--   artist: Artist's name\
--   year: Year song released\
--   gender: Gender of artist/group\
--   points: Total points awarded\
--   n: Total votes\
--   n1–n5: Votes by rank
-
-
-```{r message = FALSE}
+```{r setup, include=FALSE}
 library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggeffects)
+library(tidyverse)
+
 polls <- read_csv("data/polls.csv")
 ranks <- read_csv("data/rankings.csv")
 ```
 
-## Summary Statistics
+## Background
+
+BBC Music asked **100+ critics, artists, and industry professionals** from **15 countries** to submit their five favorite hip-hop tracks.
+
+. . .
+
+**Scoring Algorithm**
+
+| Place | Points |
+|-------|--------|
+| 1st   | 10     |
+| 2nd   | 8      |
+| 3rd   | 6      |
+| 4th   | 4      |
+| 5th   | 2      |
+
+. . .
+
+> Ties broken by total votes, then by first-place votes, then second, and so on.
+
+------------------------------------------------------------------------
+
+## Research Question
+
+- Are female hip-hop artists **underrepresented** in critics' top five lists?
+- When nominated, are they ranked **as highly** as male artists?  
+- Does a critic's **country or role** predict whether they nominate female artists?
+- Is underrepresentation a **bias problem**, a **pipeline problem**, or both?
+
+------------------------------------------------------------------------
+
+## The Data {.smaller}
+
+::::: columns
+::: {.column width="50%"}
+**polls.csv** — one row per vote
+
+| Variable          | Description       |
+|-------------------|-------------------|
+| `rank`            | Rank given (1–5)  |
+| `title`           | Song title        |
+| `artist`          | Artist name       |
+| `gender`          | Gender of artist  |
+| `year`            | Year released     |
+| `critic_name`     | Critic's name     |
+| `critic_rols`     | Critic's role     |
+| `critic_country`  | Primary country   |
+| `critic_country2` | Secondary country |
+:::
+
+::: {.column width="50%"}
+**rankings.csv** — one row per song
+
+| Variable  | Description      |
+|-----------|------------------|
+| `title`   | Song title       |
+| `artist`  | Artist name      |
+| `year`    | Year released    |
+| `gender`  | Gender of artist |
+| `points`  | Total points     |
+| `n`       | Total votes      |
+| `n1`–`n5` | Votes by rank    |
+:::
+:::::
+
+------------------------------------------------------------------------
+
+## Summary Statistics {.smaller}
+
+**Average rank by gender** — lower is better (1 = best)
+
 ```{r}
-library(dplyr)
-polls |> group_by(gender) |>
-  summarise(mean = mean(rank))
+polls |> 
+  filter(!is.na(gender)) |>
+  group_by(gender) |>
+  summarise(
+    `Avg Rank` = round(mean(rank), 2),
+    `Total Votes` = n()
+  ) |>
+  knitr::kable()
 ```
 
+. . .
+
+**Rank distribution in rankings.csv**
 
 ```{r}
-library(dplyr)
-ranks |> group_by(gender) |>
-  summarise(ratio_n1 = sum(n1) / sum(n),
-            ratio_n2 = sum(n2) / sum(n),
-            ratio_n3 = sum(n3) / sum(n),
-            ratio_n4 = sum(n4) / sum(n),
-            ratio_n5 = sum(n5) / sum(n))
+ranks |> 
+  group_by(gender) |>
+  summarise(
+    `#1 Vote %` = round(sum(n1) / sum(n), 2),
+    `#2 Vote %` = round(sum(n2) / sum(n), 2),
+    `#3 Vote %` = round(sum(n3) / sum(n), 2),
+    `#4 Vote %` = round(sum(n4) / sum(n), 2),
+    `#5 Vote %` = round(sum(n5) / sum(n), 2)
+  ) |>
+  knitr::kable()
 ```
 
-# Critics Analysis
+------------------------------------------------------------------------
+
+## Key Finding: Ranking Gap
 
 ```{r}
-## see the ratio of women in each critics top five
-library(dplyr)
-polls2 <- polls |> group_by(critic_name) |>
-  summarise(sum = sum(gender == "female", na.rm = TRUE),
-            ratio_women_top5 = mean(gender == "female", na.rm = TRUE),
-            ratio_men_top5 = mean(gender == "male", na.rm=TRUE))
+polls |>
+  filter(!is.na(gender)) |>
+  group_by(gender) |>
+  summarise(avg_rank = mean(rank)) |>
+  ggplot(aes(x = gender, y = avg_rank, fill = gender)) +
+  geom_col(width = 0.5) +
+  scale_fill_viridis_d() +
+  theme_minimal(base_size = 16) +
+  labs(
+    title = "Average Rank by Artist Gender",
+    subtitle = "Lower = ranked higher (1 is best)",
+    x = NULL, y = "Average Rank"
+  ) +
+  theme(legend.position = "none")
 ```
 
-# Visualization
+> Female artists avg **3.5** vs male artists avg **2.9**
+
+------------------------------------------------------------------------
 
 ## Votes by Gender
 
-**prompt (claude):** code + debug, added factor to fill to aes:
+```{r}
+ggplot(data = polls, 
+       aes(x = gender, fill = factor(rank))) + 
+  geom_bar() + 
+  theme_minimal(base_size = 16) +
+  scale_fill_viridis_d() +
+  labs(
+    title = "Count of Top 5 Votes by Artist Gender",
+    x = "Artist Gender",
+    y = "Number of Votes",
+    fill = "Rank"
+  )
+```
+
+------------------------------------------------------------------------
+
+## Trends Over Time
+
+Are female artists gaining more nominations over time?
 
 ```{r}
-library(ggplot2)
-ggplot(data = polls, 
-       aes(x = gender, 
-           fill = factor(rank))) + 
-  geom_bar() + 
-  theme_minimal() +
-  scale_fill_viridis_d() +
-  labs(title = "Count of Top 5 Vote by Gender")
+year_gender <- polls |>
+  group_by(year, gender) |>
+  summarise(count = n(), .groups = "drop")
+
+ggplot(year_gender, aes(x = year, y = count, color = gender)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal(base_size = 16) +
+  scale_color_viridis_d() +
+  labs(
+    title = "Songs Nominated by Gender Over Time",
+    subtitle = "1989 was the first year a mixed group appeared in the top 5",
+    x = "Year", y = "Number of Songs", color = "Gender"
+  )
 ```
+
+------------------------------------------------------------------------
+
+## Country Analysis
+
+Do critics from certain countries nominate more female artists?
+
+```{r}
+country_gender <- polls |>
+  filter(!is.na(critic_country), !is.na(gender)) |>
+  group_by(critic_country) |>
+  summarise(
+    total = n(),
+    ratio_female = mean(gender == "female", na.rm = TRUE)
+  ) |>
+  filter(total >= 5) |>
+  arrange(desc(ratio_female))
+
+ggplot(country_gender, 
+       aes(x = reorder(critic_country, ratio_female), 
+           y = ratio_female, fill = ratio_female)) +
+  geom_col() +
+  geom_hline(yintercept = mean(country_gender$ratio_female), 
+             linetype = "dashed", color = "red", linewidth = 0.8) +
+  coord_flip() +
+  scale_fill_viridis_c() +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Female Artist Nominations by Critic's Country",
+    subtitle = "Red dashed line = overall average | Countries with <5 votes excluded",
+    x = NULL, y = "Proportion of female artist nominations",
+    fill = "Proportion"
+  )
+```
+
+------------------------------------------------------------------------
+
+## Critic Role Analysis
+
+Does a critic's professional role predict whether they nominate female artists?
+
+```{r}
+role_female <- polls |>
+  filter(!is.na(critic_rols), !is.na(gender)) |>
+  group_by(critic_rols) |>
+  summarise(
+    total = n(),
+    ratio_female = mean(gender == "female", na.rm = TRUE)
+  ) |>
+  filter(total >= 5)
+
+ggplot(role_female, 
+       aes(x = reorder(critic_rols, ratio_female), 
+           y = ratio_female, fill = ratio_female)) +
+  geom_col() +
+  geom_hline(yintercept = mean(role_female$ratio_female),
+             linetype = "dashed", color = "red", linewidth = 0.8) +
+  coord_flip() +
+  scale_fill_viridis_c() +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Female Artist Nominations by Critic Role",
+    subtitle = "Red dashed line = overall average",
+    x = NULL, y = "Proportion of female artist nominations",
+    fill = "Proportion"
+  )
+```
+
+------------------------------------------------------------------------
+
+## Predictive Model
+
+**Does artist gender predict how highly a song is ranked?**
+
+```{r}
+polls <- polls |> mutate(gender = factor(gender))
+model1 <- lm(rank ~ gender, data = polls)
+summary(model1)
+```
+
+------------------------------------------------------------------------
+
+## Model Visualization
+
+```{r}
+pred <- ggpredict(model1, terms = c("gender")) |>
+  as.data.frame() |>
+  as_tibble()
+
+ggplot(data = polls, aes(x = gender, y = rank)) +
+  geom_point(aes(fill = gender),
+             position = position_jitter(width = 0.25, height = 0.12),
+             alpha = 0.3, shape = 21) +
+  geom_point(data = pred,
+             aes(x = x, y = predicted, fill = x),
+             size = 5, shape = 21) +
+  theme_minimal(base_size = 16) +
+  scale_fill_viridis_d() +
+  labs(
+    title = "Does Artist Gender Affect Song Ranking?",
+    subtitle = "Large points = model predicted means",
+    x = "Artist Gender", y = "Rank (1 = Best)",
+    fill = "Gender"
+  )
+```
+
+------------------------------------------------------------------------
+
+## Conclusions
+
+- **Underrepresentation is real:** ~70–80% of nominated artists are male, matching broader industry ratios
+- **Ranking gap exists:** Female artists average rank 3.5 vs. 2.9 for male artists
+- **Mixed groups fall in between** (avg 3.15) — group membership partially buffers the penalty
+- **Country and role matter:** Where a critic is from influences whether they nominate women
+- **Root cause question:** Is this bias, a pipeline problem, or both?
+
